@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HomeJoy MVP Preview</title>
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, .2);
+            --glass-border: rgba(255, 255, 255, .35);
+            --text: #fff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "SF Pro Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            background: linear-gradient(135deg, #6EE7B7, #3B82F6);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            transition: background .35s ease;
+        }
+
+        .phone {
+            width: min(430px, 100%);
+            min-height: 760px;
+            border-radius: 34px;
+            border: 1px solid rgba(255, 255, 255, .28);
+            backdrop-filter: blur(16px);
+            background: rgba(10, 20, 40, .18);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+            overflow: hidden;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .title {
+            font-size: 34px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .subtitle {
+            opacity: .9;
+            font-size: 18px;
+        }
+
+        .bubbles {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-content: flex-start;
+            margin-top: 8px;
+        }
+
+        .bubble {
+            width: calc(50% - 6px);
+            border-radius: 24px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 14px;
+            cursor: pointer;
+            transition: transform .18s ease, opacity .22s ease;
+            user-select: none;
+        }
+
+        .bubble:hover {
+            transform: translateY(-2px);
+        }
+
+        .bubble.done {
+            opacity: .45;
+        }
+
+        .bubble h4 {
+            margin: 0 0 8px;
+            font-size: 16px;
+        }
+
+        .bubble p {
+            margin: 0;
+            font-size: 12px;
+            opacity: .92;
+        }
+
+        .swap {
+            height: 48px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            color: #fff;
+            border-radius: 14px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .avatars {
+            display: flex;
+            gap: 14px;
+            margin-top: 4px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .avatar {
+            text-align: center;
+            min-width: 64px;
+        }
+
+        .avatar .face {
+            width: 52px;
+            height: 52px;
+            border-radius: 999px;
+            margin: 0 auto 6px;
+            display: grid;
+            place-items: center;
+            font-size: 26px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+        }
+
+        .avatar.ghost {
+            opacity: .4;
+        }
+
+        .avatar span {
+            font-size: 12px;
+        }
+
+        .chip {
+            display: inline-block;
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, .16);
+            margin-top: 4px;
+        }
+
+        .status {
+            min-height: 20px;
+            font-size: 12px;
+            opacity: .9;
+            margin-top: -6px;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, .45);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 99;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .sheet {
+            width: min(430px, calc(100% - 20px));
+            background: rgba(15, 23, 42, .95);
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 18px 18px 0 0;
+            padding: 14px 14px 18px;
+            margin-bottom: 0;
+        }
+
+        .sheet h3 {
+            margin: 0 0 10px;
+            font-size: 16px;
+        }
+
+        .sheet-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 46vh;
+            overflow: auto;
+        }
+
+        .sheet-item {
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, .08);
+            color: #fff;
+            border-radius: 12px;
+            padding: 10px;
+            text-align: left;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .sheet-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .sheet-actions button {
+            flex: 1;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, .1);
+            color: #fff;
+            height: 40px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="phone">
+        <div class="title">Home Climate</div>
+        <div class="subtitle" id="scoreText">Harmony Score: 100</div>
+        <div class="chip" id="weatherChip">Sunny</div>
+        <div class="status" id="swapStatus"></div>
+
+        <section class="bubbles" id="bubbles"></section>
+
+        <button class="swap" id="swapBtn">One-Tap Swap</button>
+
+        <section class="avatars">
+            <div class="avatar ghost">
+                <div class="face">🦊</div><span>Alex</span>
+            </div>
+            <div class="avatar">
+                <div class="face">🐼</div><span>Jamie</span>
+            </div>
+            <div class="avatar">
+                <div class="face">🐨</div><span>Kai</span>
+            </div>
+        </section>
+    </main>
+
+    <div class="modal" id="swapModal" aria-hidden="true">
+        <div class="sheet">
+            <h3>One-Tap Swap：選擇要換手的任務</h3>
+            <div class="sheet-list" id="swapTaskList"></div>
+            <div class="sheet-actions">
+                <button id="swapBroadcastBtn">廣播給全家</button>
+                <button id="swapCancelBtn">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chores = [
+            { id: 'c1', title: 'Water plants', weight: 3, done: false },
+            { id: 'c2', title: 'Fold laundry', weight: 4, done: false },
+            { id: 'c3', title: 'Clean table', weight: 2, done: false },
+            { id: 'c4', title: 'Take out trash', weight: 5, done: false }
+        ];
+
+        const family = ['Alex', 'Jamie', 'Kai'];
+        let selectedSwapTaskId = null;
+
+        const bubbles = document.getElementById('bubbles');
+        const scoreText = document.getElementById('scoreText');
+        const weatherChip = document.getElementById('weatherChip');
+        const swapStatus = document.getElementById('swapStatus');
+        const swapModal = document.getElementById('swapModal');
+        const swapTaskList = document.getElementById('swapTaskList');
+        const swapBroadcastBtn = document.getElementById('swapBroadcastBtn');
+        const swapCancelBtn = document.getElementById('swapCancelBtn');
+
+        function calcScore() {
+            const pending = chores.filter(c => !c.done).reduce((s, c) => s + c.weight, 0);
+            return Math.max(0, Math.min(100, 100 - pending));
+        }
+
+        function weatherFrom(score) {
+            if (score > 80) return 'Sunny';
+            if (score >= 50) return 'Cloudy';
+            return 'Rainy';
+        }
+
+        function paintBackground(weather) {
+            if (weather === 'Sunny') {
+                document.body.style.background = 'linear-gradient(135deg, #6EE7B7, #3B82F6)';
+            } else if (weather === 'Cloudy') {
+                document.body.style.background = 'linear-gradient(135deg, #94A3B8, #64748B)';
+            } else {
+                document.body.style.background = 'linear-gradient(135deg, #1E293B, #334155)';
+            }
+            weatherChip.textContent = weather;
+        }
+
+        function render() {
+            bubbles.innerHTML = '';
+            chores.forEach((chore, i) => {
+                const el = document.createElement('article');
+                el.className = 'bubble' + (chore.done ? ' done' : '');
+                el.innerHTML = `<h4>${chore.title}</h4><p>Weight ${chore.weight}</p><p>${chore.done ? 'Done ✓' : 'Tap to complete'}</p>`;
+                el.addEventListener('click', () => {
+                    chores[i].done = !chores[i].done;
+                    render();
+                });
+                bubbles.appendChild(el);
+            });
+
+            const score = calcScore();
+            scoreText.textContent = `Harmony Score: ${score}`;
+            paintBackground(weatherFrom(score));
+        }
+
+        function openSwapModal() {
+            const pending = chores.filter(c => !c.done);
+            if (!pending.length) {
+                swapStatus.textContent = '目前沒有可換手任務，太棒了！';
+                return;
+            }
+
+            selectedSwapTaskId = pending[0].id;
+            swapTaskList.innerHTML = '';
+
+            pending.forEach(task => {
+                const btn = document.createElement('button');
+                btn.className = 'sheet-item';
+                btn.innerHTML = `<strong>${task.title}</strong><br><small>Weight ${task.weight}</small>`;
+                btn.addEventListener('click', () => {
+                    selectedSwapTaskId = task.id;
+                    requestSpecificHelp(task);
+                });
+                swapTaskList.appendChild(btn);
+            });
+
+            swapStatus.textContent = '選擇一個任務發出求援';
+            swapModal.classList.add('show');
+            swapModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeSwapModal() {
+            swapModal.classList.remove('show');
+            swapModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function requestSpecificHelp(task) {
+            const helper = family[Math.floor(Math.random() * family.length)];
+            swapStatus.textContent = `已送出求援：${task.title}，${helper} 可能會接手。`;
+            closeSwapModal();
+        }
+
+        function requestBroadcastHelp() {
+            const task = chores.find(c => c.id === selectedSwapTaskId) || chores.find(c => !c.done);
+            if (!task) {
+                swapStatus.textContent = '目前沒有待處理任務可廣播。';
+                closeSwapModal();
+                return;
+            }
+            swapStatus.textContent = `已廣播求援：${task.title}，等待隊友回應中。`;
+            closeSwapModal();
+        }
+
+        document.getElementById('swapBtn').addEventListener('click', openSwapModal);
+        swapBroadcastBtn.addEventListener('click', requestBroadcastHelp);
+        swapCancelBtn.addEventListener('click', closeSwapModal);
+        swapModal.addEventListener('click', (event) => {
+            if (event.target === swapModal) {
+                closeSwapModal();
+            }
+        });
+
+        render();
+    </script>
+</body>
+
+</html>
