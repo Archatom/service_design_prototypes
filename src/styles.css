@@ -375,6 +375,31 @@ body {
     margin: 0;
 }
 
+.section-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.list-edit-toggle {
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 0 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.list-edit-toggle.active {
+    background: rgba(59, 130, 246, 0.32);
+    border-color: rgba(147, 197, 253, 0.8);
+}
+
 .list-quick-add {
     height: 32px;
     border-radius: 999px;
@@ -762,18 +787,60 @@ body {
 
 .card-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 10px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+}
+
+.card-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
 }
 
 .card-title {
     margin: 0;
-    font-size: 16px;
-    line-height: 1.35;
+    font-size: clamp(24px, 2.2vw, 28px);
+    line-height: 1.2;
     font-weight: 700;
     letter-spacing: 0.2px;
+}
+
+.weight-chip {
+    min-width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.weight-chip.critical {
+    background: rgba(239, 68, 68, 0.8);
+}
+
+.weight-chip.high {
+    background: rgba(249, 115, 22, 0.8);
+}
+
+.weight-chip.medium {
+    background: rgba(234, 179, 8, 0.8);
+}
+
+.weight-chip.low {
+    background: rgba(34, 197, 94, 0.8);
+}
+
+.weight-chip.light {
+    background: rgba(56, 189, 248, 0.8);
 }
 
 .card-state {
@@ -791,13 +858,6 @@ body {
 
 .card-state.done {
     background: rgba(34, 197, 94, 0.2);
-}
-
-.card-weight {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    opacity: 0.96;
 }
 
 .bubble p {
@@ -831,7 +891,7 @@ body {
 .card-actions {
     margin-top: 10px;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
 }
 
@@ -853,6 +913,109 @@ body {
 .card-actions.danger button:first-child {
     border-color: rgba(248, 113, 113, 0.7);
     background: rgba(248, 113, 113, 0.16);
+}
+
+.slide-complete {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.slide-complete-range {
+    width: clamp(190px, 60%, 280px);
+    appearance: none;
+    -webkit-appearance: none;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    background: rgba(255, 255, 255, 0.12);
+    padding: 0 7px;
+    cursor: pointer;
+}
+
+.slide-complete-range:disabled {
+    opacity: 0.85;
+    cursor: not-allowed;
+}
+
+.slide-complete-range::-webkit-slider-runnable-track {
+    height: 14px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.55));
+}
+
+.slide-complete-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    background: #fff;
+    margin-top: -8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.slide-complete-range::-moz-range-track {
+    height: 14px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.55));
+}
+
+.slide-complete-range::-moz-range-thumb {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.slide-complete-done {
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #86efac;
+}
+
+.slide-complete-done-wrap {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.slide-complete-done-wrap .slide-complete-done {
+    margin-top: 0;
+}
+
+.slide-undo-btn {
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid rgba(250, 204, 21, 0.7);
+    background: rgba(250, 204, 21, 0.16);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.card-reopen-btn {
+    margin-top: 8px;
+    width: 100%;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(250, 204, 21, 0.65);
+    background: rgba(250, 204, 21, 0.14);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 .card-edit {

@@ -26,6 +26,7 @@ const initialChores = [
 const HELP_CREDIT_WEEKLY_LIMIT = 3;
 const HELP_CREDIT_SPEND = 1;
 const HELP_CREDIT_EARN = 0.5;
+const COMPLETION_UNDO_WINDOW_MS = 3000;
 
 function round(value) {
     return Math.round(value);
@@ -126,6 +127,14 @@ function recurrenceLabel(recurrence) {
     if (recurrence === 'weekly') return '每週';
     if (recurrence === 'monthly') return '每月';
     return '單次';
+}
+
+function weightTone(weight) {
+    if (weight >= 5) return 'critical';
+    if (weight >= 4) return 'high';
+    if (weight >= 3) return 'medium';
+    if (weight >= 2) return 'low';
+    return 'light';
 }
 
 function roleLabel(role) {
@@ -248,6 +257,7 @@ export default function App() {
     const [swapOpen, setSwapOpen] = useState(false);
     const [membersOpen, setMembersOpen] = useState(false);
     const [quickAddOpen, setQuickAddOpen] = useState(false);
+    const [listEditMode, setListEditMode] = useState(false);
     const [swapSubmitting, setSwapSubmitting] = useState(false);
     const [swapStatus, setSwapStatus] = useState('');
     const [selectedChoreId, setSelectedChoreId] = useState(null);
@@ -277,10 +287,14 @@ export default function App() {
     const [editDate, setEditDate] = useState(() => dateKeyLocal(new Date()));
     const [editRecurrence, setEditRecurrence] = useState('none');
     const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+    const [completionSlideById, setCompletionSlideById] = useState({});
+    const [completionUndoById, setCompletionUndoById] = useState({});
+    const [completionCountdownNow, setCompletionCountdownNow] = useState(Date.now());
     const weatherRef = useRef('sunny');
     const acceptTimerRef = useRef(null);
     const clearHighlightTimerRef = useRef(null);
     const clearToastTimerRef = useRef(null);
+    const completionUndoTimersRef = useRef({});
     const newTitleInputRef = useRef(null);
 
     const activeMembers = useMemo(() => members.filter((member) => member.active), [members]);
@@ -291,7 +305,15 @@ export default function App() {
     const currentUser = memberById[currentUserId] || null;
     const canManageMembers = currentUser?.role === 'owner' || currentUser?.role === 'admin';
 
-    const climate = useMemo(() => homeClimateFrom(chores), [chores]);
+    const choresForClimate = useMemo(
+        () => chores.map((chore) => (
+            !chore.done && completionUndoById[chore.id]
+                ? { ...chore, done: true }
+                : chore
+        )),
+        [chores, completionUndoById],
+    );
+    const climate = useMemo(() => homeClimateFrom(choresForClimate), [choresForClimate]);
     const weather = useMemo(() => weatherFromDirtiness(climate.dirtinessScore), [climate.dirtinessScore]);
     const weatherIcon = useMemo(() => weatherIconFrom(weather), [weather]);
     const activeDate = useMemo(
@@ -460,8 +482,24 @@ export default function App() {
             if (clearToastTimerRef.current) {
                 clearTimeout(clearToastTimerRef.current);
             }
+            Object.values(completionUndoTimersRef.current).forEach((timerId) => {
+                clearTimeout(timerId);
+            });
         };
     }, []);
+
+    useEffect(() => {
+        const entries = Object.keys(completionUndoById);
+        if (entries.length === 0) return undefined;
+
+        const timerId = setInterval(() => {
+            setCompletionCountdownNow(Date.now());
+        }, 200);
+
+        return () => {
+            clearInterval(timerId);
+        };
+    }, [completionUndoById]);
 
     const toggleChore = (id) => {
         setChores((prev) =>
@@ -471,11 +509,109 @@ export default function App() {
                 return {
                     ...item,
                     done: nextDone,
-                    doneAt: nextDone ? new Date().toISOString() : item.doneAt,
+                    doneAt: nextDone ? new Date().toISOString() : null,
                 };
             }),
         );
         track('chore_toggle', { id });
+    };
+
+    const clearCompletionUndo = (choreId) => {
+        const timerId = completionUndoTimersRef.current[choreId];
+        if (timerId) {
+            clearTimeout(timerId);
+            delete completionUndoTimersRef.current[choreId];
+        }
+        setCompletionUndoById((prev) => {
+            if (!prev[choreId]) return prev;
+            const next = { ...prev };
+            delete next[choreId];
+            return next;
+        });
+    };
+
+    const finalizePendingCompletion = (choreId) => {
+        clearCompletionUndo(choreId);
+        setCompletionSlideById((prev) => ({
+            ...prev,
+            [choreId]: 0,
+        }));
+        setChores((prev) =>
+            prev.map((item) =>
+                item.id === choreId && !item.done
+                    ? {
+                        ...item,
+                        done: true,
+                        doneAt: new Date().toISOString(),
+                    }
+                    : item,
+            ),
+        );
+        track('chore_toggle', { id: choreId, source: 'pending_completion_finalized' });
+    };
+
+    const openCompletionUndoWindow = (choreId) => {
+        clearCompletionUndo(choreId);
+        const expiresAt = Date.now() + COMPLETION_UNDO_WINDOW_MS;
+        setCompletionUndoById((prev) => ({
+            ...prev,
+            [choreId]: expiresAt,
+        }));
+        completionUndoTimersRef.current[choreId] = setTimeout(() => {
+            finalizePendingCompletion(choreId);
+        }, COMPLETION_UNDO_WINDOW_MS);
+    };
+
+    const revertCompletedChore = (choreId, reason = 'manual_revert') => {
+        clearCompletionUndo(choreId);
+        toggleChore(choreId);
+        track('chore_revert_to_todo', { choreId, reason });
+    };
+
+    const cancelPendingCompletion = (choreId, reason = 'pending_completion_cancel') => {
+        clearCompletionUndo(choreId);
+        setCompletionSlideById((prev) => ({
+            ...prev,
+            [choreId]: 0,
+        }));
+        track('chore_revert_to_todo', { choreId, reason });
+    };
+
+    const handleUndoClick = (choreId) => {
+        if (!completionUndoById[choreId]) return;
+        cancelPendingCompletion(choreId, 'undo_window_click');
+    };
+
+    const updateCompletionSlide = (choreId, value) => {
+        setCompletionSlideById((prev) => ({
+            ...prev,
+            [choreId]: value,
+        }));
+    };
+
+    const commitCompletionSlide = (chore) => {
+        const progress = completionSlideById[chore.id] ?? 0;
+        if (!chore.done && progress >= 95) {
+            setCompletionSlideById((prev) => ({
+                ...prev,
+                [chore.id]: 100,
+            }));
+            openCompletionUndoWindow(chore.id);
+            track('chore_completion_pending', { choreId: chore.id, windowMs: COMPLETION_UNDO_WINDOW_MS });
+            return;
+        }
+
+        setCompletionSlideById((prev) => ({
+            ...prev,
+            [chore.id]: 0,
+        }));
+    };
+
+    const remainingUndoSeconds = (choreId) => {
+        const expiresAt = completionUndoById[choreId];
+        if (!expiresAt) return 0;
+        const remainingMs = Math.max(0, expiresAt - completionCountdownNow);
+        return Math.ceil(remainingMs / 1000);
     };
 
     const addChore = (event) => {
@@ -963,6 +1099,19 @@ export default function App() {
         track('chore_delete_request', { choreId });
     };
 
+    const toggleListEditMode = () => {
+        setListEditMode((prev) => {
+            const next = !prev;
+            if (!next) {
+                setEditingChoreId(null);
+                setDeleteConfirmId(null);
+                setEditError('');
+            }
+            track('list_edit_mode_toggle', { enabled: next });
+            return next;
+        });
+    };
+
     const cancelDeleteChore = () => {
         setDeleteConfirmId(null);
         track('chore_delete_cancel');
@@ -1288,9 +1437,18 @@ export default function App() {
                     <section className="bubbles" aria-label="工作清單管理">
                         <div className="section-head">
                             <h3 className="section-title">工作清單管理</h3>
-                            <button type="button" className="list-quick-add" onClick={openQuickAdd}>
-                                ＋ 快速新增
-                            </button>
+                            <div className="section-actions">
+                                <button
+                                    type="button"
+                                    className={`list-edit-toggle ${listEditMode ? 'active' : ''}`}
+                                    onClick={toggleListEditMode}
+                                >
+                                    {listEditMode ? '完成編輯' : '編輯'}
+                                </button>
+                                <button type="button" className="list-quick-add" onClick={openQuickAdd}>
+                                    ＋ 快速新增
+                                </button>
+                            </div>
                         </div>
                         <div className="list-group">
                             {visibleChores.map((chore) => {
@@ -1353,10 +1511,14 @@ export default function App() {
                                         ) : (
                                             <>
                                                 <div className="card-head">
-                                                    <h4 className="card-title">{chore.title}</h4>
+                                                    <div className="card-title-row">
+                                                        <h4 className="card-title">{chore.title}</h4>
+                                                        <span className={`weight-chip ${weightTone(chore.weight)}`} aria-label={`任務比重 ${chore.weight}`}>
+                                                            {chore.weight}
+                                                        </span>
+                                                    </div>
                                                     <span className={`card-state ${chore.done ? 'done' : 'todo'}`}>{chore.done ? '已完成' : '待處理'}</span>
                                                 </div>
-                                                <p className="card-weight">Weight {chore.weight}</p>
                                                 <p className="meta">
                                                     <span className="card-assignee">
                                                         <span className="card-assignee-face" aria-hidden="true">{assigneeMember?.emoji || '👤'}</span>
@@ -1364,18 +1526,63 @@ export default function App() {
                                                     </span>
                                                     <span> · {recurrenceLabel(chore.recurrence)}</span>
                                                 </p>
-                                                {deleteConfirmId === chore.id ? (
+                                                {!chore.done ? (
+                                                    <div className="slide-complete" aria-label="滑動完成任務">
+                                                        <input
+                                                            id={`complete-${chore.id}`}
+                                                            className="slide-complete-range"
+                                                            type="range"
+                                                            min={0}
+                                                            max={100}
+                                                            step={1}
+                                                            value={completionSlideById[chore.id] ?? 0}
+                                                            disabled={Boolean(completionUndoById[chore.id])}
+                                                            onChange={(e) => updateCompletionSlide(chore.id, Number(e.target.value))}
+                                                            onMouseUp={() => commitCompletionSlide(chore)}
+                                                            onTouchEnd={() => commitCompletionSlide(chore)}
+                                                            onKeyUp={() => commitCompletionSlide(chore)}
+                                                            aria-label={`${chore.title} 完成滑塊`}
+                                                            aria-valuemin={0}
+                                                            aria-valuemax={100}
+                                                            aria-valuenow={completionSlideById[chore.id] ?? 0}
+                                                        />
+                                                        {completionUndoById[chore.id] && (
+                                                            <button
+                                                                type="button"
+                                                                className="slide-undo-btn"
+                                                                onClick={() => handleUndoClick(chore.id)}
+                                                            >
+                                                                撤銷（{remainingUndoSeconds(chore.id)}s）
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="slide-complete-done-wrap">
+                                                        <p className="slide-complete-done">已完成</p>
+                                                    </div>
+                                                )}
+                                                {listEditMode && deleteConfirmId === chore.id ? (
                                                     <div className="card-actions danger">
                                                         <button type="button" onClick={() => confirmDeleteChore(chore.id)}>確認刪除</button>
                                                         <button type="button" onClick={cancelDeleteChore}>取消</button>
                                                     </div>
-                                                ) : (
-                                                    <div className="card-actions">
-                                                        <button type="button" onClick={() => toggleChore(chore.id)}>{chore.done ? '取消完成' : '完成'}</button>
-                                                        <button type="button" onClick={() => startEditChore(chore)}>編輯</button>
-                                                        <button type="button" onClick={() => requestDeleteChore(chore.id)}>刪除</button>
-                                                    </div>
-                                                )}
+                                                ) : listEditMode ? (
+                                                    <>
+                                                        <div className="card-actions">
+                                                            <button type="button" onClick={() => startEditChore(chore)}>編輯</button>
+                                                            <button type="button" onClick={() => requestDeleteChore(chore.id)}>刪除</button>
+                                                        </div>
+                                                        {chore.done && (
+                                                            <button
+                                                                type="button"
+                                                                className="card-reopen-btn"
+                                                                onClick={() => revertCompletedChore(chore.id, 'edit_mode_reopen')}
+                                                            >
+                                                                改回未完成
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                ) : null}
                                             </>
                                         )}
                                     </article>
