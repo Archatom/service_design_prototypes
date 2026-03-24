@@ -345,6 +345,7 @@ export default function App() {
     }, [activeDate]);
 
     const weatherClass = `weather-${weather}`;
+    const showEventLog = false;
 
     const track = (type, payload) => {
         setEvents((prev) => pushEvent(prev, type, payload));
@@ -1190,247 +1191,254 @@ export default function App() {
 
     return (
         <div className={`page ${weatherClass}`}>
-            <main className="phone">
-                <section className="control-hub" aria-label="顯示與新增控制中心">
-                    <div className="hub-head">
-                        <div className="hub-title-row">
-                            <span className="workspace-chip">{workspace.name}</span>
-                            <span
-                                className="workspace-user-avatar"
-                                role="img"
-                                aria-label={`登入身份：${currentUserIdentity}`}
-                                title={`登入身份：${currentUserIdentity}`}
-                            >
-                                {currentUserAvatar}
-                            </span>
-                        </div>
-                    </div>
-
-                    <section className="dirtiness-card hub-panel" aria-label="髒亂指數與每月進度">
-                        <div className="dirtiness-head">
-                            <div className="hero-side hero-side-solo">
-                                <p className="hero-icon">
-                                    <span className="hero-icon-mark" aria-hidden="true">{weatherIcon}</span>
-                                    <span className="hero-icon-text">髒亂指數</span>
-                                </p>
-                                <strong>{selectedDayStats ? `${selectedDayStats.dirtinessScore}%` : `${climate.dirtinessScore}%`}</strong>
-                                <p className="hero-hint">{selectedDateLabel} · 待處理 {pending.length} 件</p>
+            <main className="app-shell">
+                <section className="top-panel" aria-label="控制與概況區">
+                    <section className="control-hub" aria-label="顯示與新增控制中心">
+                        <div className="hub-head">
+                            <div className="hub-title-row">
+                                <span className="workspace-chip">{workspace.name}</span>
+                                <span
+                                    className="workspace-user-avatar"
+                                    role="img"
+                                    aria-label={`登入身份：${currentUserIdentity}`}
+                                    title={`登入身份：${currentUserIdentity}`}
+                                >
+                                    {currentUserAvatar}
+                                </span>
                             </div>
-                            <button
-                                type="button"
-                                className="calendar-toggle-btn dirtiness-toggle-btn"
-                                onClick={toggleCalendarCollapsed}
-                                aria-expanded={!calendarCollapsed}
-                            >
-                                {calendarCollapsed ? '查看每月進度' : '收起每月進度'}
+                        </div>
+
+                        <section className="dirtiness-card hub-panel" aria-label="髒亂指數與每月進度">
+                            <div className="dirtiness-head">
+                                <div className="hero-side hero-side-solo">
+                                    <p className="hero-icon">
+                                        <span className="hero-icon-mark" aria-hidden="true">{weatherIcon}</span>
+                                        <span className="hero-icon-text">髒亂指數</span>
+                                    </p>
+                                    <strong>{selectedDayStats ? `${selectedDayStats.dirtinessScore}%` : `${climate.dirtinessScore}%`}</strong>
+                                    <p className="hero-hint">{selectedDateLabel} · 待處理 {pending.length} 件</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="calendar-toggle-btn dirtiness-toggle-btn"
+                                    onClick={toggleCalendarCollapsed}
+                                    aria-expanded={!calendarCollapsed}
+                                >
+                                    {calendarCollapsed ? '查看每月進度' : '收起每月進度'}
+                                </button>
+                            </div>
+
+                            {!calendarCollapsed && (
+                                <div className="dirtiness-monthly">
+                                    <div className="calendar-head">
+                                        <div>
+                                            <p className="calendar-title">回顧日曆</p>
+                                            <strong className="calendar-month">{selectedMonth.toLocaleString('zh-TW', { year: 'numeric', month: 'long' })}</strong>
+                                        </div>
+                                        <div className="calendar-nav" aria-label="月份切換">
+                                            <button type="button" onClick={goToPrevMonth} aria-label="上一個月">
+                                                ‹
+                                            </button>
+                                            <button type="button" onClick={goToNextMonth} aria-label="下一個月">
+                                                ›
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="calendar-weekdays">
+                                        {['日', '一', '二', '三', '四', '五', '六'].map((label) => (
+                                            <span key={label}>{label}</span>
+                                        ))}
+                                    </div>
+                                    <div className="calendar-grid" role="grid">
+                                        {monthCells.map((cell, idx) =>
+                                            cell ? (
+                                                <button
+                                                    key={cell.key}
+                                                    className={`calendar-cell ${cell.stats?.weather || 'empty'} ${selectedDayKey === cell.key ? 'active' : ''}`}
+                                                    onClick={() => selectDay(cell.key)}
+                                                    role="gridcell"
+                                                    aria-pressed={selectedDayKey === cell.key}
+                                                >
+                                                    <span className="calendar-day">{cell.date.getDate()}</span>
+                                                    <span className="calendar-metric">{cell.stats ? `${cell.stats.dirtinessScore}%` : '--'}</span>
+                                                </button>
+                                            ) : (
+                                                <span key={`blank-${idx}`} className="calendar-cell placeholder" aria-hidden="true" />
+                                            ),
+                                        )}
+                                    </div>
+                                    <div className="calendar-legend">
+                                        <span className="legend-item"><span className="dot sunny" /> 晴 ≤ 20</span>
+                                        <span className="legend-item"><span className="dot cloudy" /> 多雲 ≤ 45</span>
+                                        <span className="legend-item"><span className="dot overcast" /> 陰 ≤ 70</span>
+                                        <span className="legend-item"><span className="dot rainy" /> 雨 &gt; 70</span>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+
+                        {successToast && <p className="toast success">{successToast}</p>}
+
+                    </section>
+
+                </section>
+
+                <section className="content-panel" aria-label="工作與事件區">
+                    <section className="bubbles" aria-label="工作清單管理">
+                        <div className="section-head">
+                            <h3 className="section-title">工作清單管理</h3>
+                            <button type="button" className="list-quick-add" onClick={openQuickAdd}>
+                                ＋ 快速新增
                             </button>
                         </div>
-
-                        {!calendarCollapsed && (
-                            <div className="dirtiness-monthly">
-                                <div className="calendar-head">
-                                    <div>
-                                        <p className="calendar-title">回顧日曆</p>
-                                        <strong className="calendar-month">{selectedMonth.toLocaleString('zh-TW', { year: 'numeric', month: 'long' })}</strong>
-                                    </div>
-                                    <div className="calendar-nav" aria-label="月份切換">
-                                        <button type="button" onClick={goToPrevMonth} aria-label="上一個月">
-                                            ‹
-                                        </button>
-                                        <button type="button" onClick={goToNextMonth} aria-label="下一個月">
-                                            ›
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="calendar-weekdays">
-                                    {['日', '一', '二', '三', '四', '五', '六'].map((label) => (
-                                        <span key={label}>{label}</span>
-                                    ))}
-                                </div>
-                                <div className="calendar-grid" role="grid">
-                                    {monthCells.map((cell, idx) =>
-                                        cell ? (
-                                            <button
-                                                key={cell.key}
-                                                className={`calendar-cell ${cell.stats?.weather || 'empty'} ${selectedDayKey === cell.key ? 'active' : ''}`}
-                                                onClick={() => selectDay(cell.key)}
-                                                role="gridcell"
-                                                aria-pressed={selectedDayKey === cell.key}
-                                            >
-                                                <span className="calendar-day">{cell.date.getDate()}</span>
-                                                <span className="calendar-metric">{cell.stats ? `${cell.stats.dirtinessScore}%` : '--'}</span>
-                                            </button>
-                                        ) : (
-                                            <span key={`blank-${idx}`} className="calendar-cell placeholder" aria-hidden="true" />
-                                        ),
-                                    )}
-                                </div>
-                                <div className="calendar-legend">
-                                    <span className="legend-item"><span className="dot sunny" /> 晴 ≤ 20</span>
-                                    <span className="legend-item"><span className="dot cloudy" /> 多雲 ≤ 45</span>
-                                    <span className="legend-item"><span className="dot overcast" /> 陰 ≤ 70</span>
-                                    <span className="legend-item"><span className="dot rainy" /> 雨 &gt; 70</span>
-                                </div>
-                            </div>
-                        )}
-                    </section>
-
-                    {successToast && <p className="toast success">{successToast}</p>}
-
-                </section>
-
-                <section className="bubbles" aria-label="工作清單管理">
-                    <div className="section-head">
-                        <h3 className="section-title">工作清單管理</h3>
-                        <button type="button" className="list-quick-add" onClick={openQuickAdd}>
-                            ＋ 快速新增
-                        </button>
-                    </div>
-                    <div className="list-group">
-                        {visibleChores.map((chore) => {
-                            const assigneeMember = memberById[chore.assigneeId];
-                            const assigneeLabel = assigneeMember?.name || '未分配';
-                            return (
-                                <article key={chore.id} className={`bubble ${chore.done ? 'done' : ''} ${highlightedChoreId === chore.id ? 'highlight' : ''}`}>
-                                    {editingChoreId === chore.id ? (
-                                        <div className="card-edit">
-                                            <input
-                                                className="chore-input"
-                                                value={editTitle}
-                                                onChange={(e) => setEditTitle(e.target.value)}
-                                                placeholder="工作名稱"
-                                            />
-                                            <div className="card-edit-row">
-                                                <select
-                                                    className="chore-select"
-                                                    value={editWeight}
-                                                    onChange={(e) => setEditWeight(Number(e.target.value))}
-                                                >
-                                                    {[1, 2, 3, 4, 5].map((weight) => (
-                                                        <option key={weight} value={weight}>{weight}</option>
-                                                    ))}
-                                                </select>
-                                                <select
-                                                    className="chore-select"
-                                                    value={editAssignee}
-                                                    onChange={(e) => setEditAssignee(e.target.value)}
-                                                >
-                                                    {activeMembers.map((member) => (
-                                                        <option key={member.id} value={member.id}>{member.name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="card-edit-row">
+                        <div className="list-group">
+                            {visibleChores.map((chore) => {
+                                const assigneeMember = memberById[chore.assigneeId];
+                                const assigneeLabel = assigneeMember?.name || '未分配';
+                                return (
+                                    <article key={chore.id} className={`bubble ${chore.done ? 'done' : ''} ${highlightedChoreId === chore.id ? 'highlight' : ''}`}>
+                                        {editingChoreId === chore.id ? (
+                                            <div className="card-edit">
                                                 <input
-                                                    type="date"
                                                     className="chore-input"
-                                                    value={editDate}
-                                                    onChange={(e) => setEditDate(e.target.value)}
+                                                    value={editTitle}
+                                                    onChange={(e) => setEditTitle(e.target.value)}
+                                                    placeholder="工作名稱"
                                                 />
-                                                <select
-                                                    className="chore-select"
-                                                    value={editRecurrence}
-                                                    onChange={(e) => setEditRecurrence(e.target.value)}
-                                                >
-                                                    <option value="none">不重複</option>
-                                                    <option value="daily">每日</option>
-                                                    <option value="weekly">每週</option>
-                                                    <option value="monthly">每月</option>
-                                                </select>
-                                            </div>
-                                            {editError && <p className="form-error">{editError}</p>}
-                                            <div className="card-actions">
-                                                <button type="button" onClick={() => saveEditChore(chore.id)}>儲存</button>
-                                                <button type="button" onClick={cancelEditChore}>取消</button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="card-head">
-                                                <h4 className="card-title">{chore.title}</h4>
-                                                <span className={`card-state ${chore.done ? 'done' : 'todo'}`}>{chore.done ? '已完成' : '待處理'}</span>
-                                            </div>
-                                            <p className="card-weight">Weight {chore.weight}</p>
-                                            <p className="meta">
-                                                <span className="card-assignee">
-                                                    <span className="card-assignee-face" aria-hidden="true">{assigneeMember?.emoji || '👤'}</span>
-                                                    <span>{assigneeLabel}</span>
-                                                </span>
-                                                <span> · {recurrenceLabel(chore.recurrence)}</span>
-                                            </p>
-                                            {deleteConfirmId === chore.id ? (
-                                                <div className="card-actions danger">
-                                                    <button type="button" onClick={() => confirmDeleteChore(chore.id)}>確認刪除</button>
-                                                    <button type="button" onClick={cancelDeleteChore}>取消</button>
+                                                <div className="card-edit-row">
+                                                    <select
+                                                        className="chore-select"
+                                                        value={editWeight}
+                                                        onChange={(e) => setEditWeight(Number(e.target.value))}
+                                                    >
+                                                        {[1, 2, 3, 4, 5].map((weight) => (
+                                                            <option key={weight} value={weight}>{weight}</option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        className="chore-select"
+                                                        value={editAssignee}
+                                                        onChange={(e) => setEditAssignee(e.target.value)}
+                                                    >
+                                                        {activeMembers.map((member) => (
+                                                            <option key={member.id} value={member.id}>{member.name}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
-                                            ) : (
+                                                <div className="card-edit-row">
+                                                    <input
+                                                        type="date"
+                                                        className="chore-input"
+                                                        value={editDate}
+                                                        onChange={(e) => setEditDate(e.target.value)}
+                                                    />
+                                                    <select
+                                                        className="chore-select"
+                                                        value={editRecurrence}
+                                                        onChange={(e) => setEditRecurrence(e.target.value)}
+                                                    >
+                                                        <option value="none">不重複</option>
+                                                        <option value="daily">每日</option>
+                                                        <option value="weekly">每週</option>
+                                                        <option value="monthly">每月</option>
+                                                    </select>
+                                                </div>
+                                                {editError && <p className="form-error">{editError}</p>}
                                                 <div className="card-actions">
-                                                    <button type="button" onClick={() => toggleChore(chore.id)}>{chore.done ? '取消完成' : '完成'}</button>
-                                                    <button type="button" onClick={() => startEditChore(chore)}>編輯</button>
-                                                    <button type="button" onClick={() => requestDeleteChore(chore.id)}>刪除</button>
+                                                    <button type="button" onClick={() => saveEditChore(chore.id)}>儲存</button>
+                                                    <button type="button" onClick={cancelEditChore}>取消</button>
                                                 </div>
-                                            )}
-                                        </>
-                                    )}
-                                </article>
-                            );
-                        })}
-                    </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="card-head">
+                                                    <h4 className="card-title">{chore.title}</h4>
+                                                    <span className={`card-state ${chore.done ? 'done' : 'todo'}`}>{chore.done ? '已完成' : '待處理'}</span>
+                                                </div>
+                                                <p className="card-weight">Weight {chore.weight}</p>
+                                                <p className="meta">
+                                                    <span className="card-assignee">
+                                                        <span className="card-assignee-face" aria-hidden="true">{assigneeMember?.emoji || '👤'}</span>
+                                                        <span>{assigneeLabel}</span>
+                                                    </span>
+                                                    <span> · {recurrenceLabel(chore.recurrence)}</span>
+                                                </p>
+                                                {deleteConfirmId === chore.id ? (
+                                                    <div className="card-actions danger">
+                                                        <button type="button" onClick={() => confirmDeleteChore(chore.id)}>確認刪除</button>
+                                                        <button type="button" onClick={cancelDeleteChore}>取消</button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="card-actions">
+                                                        <button type="button" onClick={() => toggleChore(chore.id)}>{chore.done ? '取消完成' : '完成'}</button>
+                                                        <button type="button" onClick={() => startEditChore(chore)}>編輯</button>
+                                                        <button type="button" onClick={() => requestDeleteChore(chore.id)}>刪除</button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </article>
+                                );
+                            })}
+                        </div>
 
-                    {visibleChores.length === 0 && (
-                        <p className="calendar-empty">目前沒有工作，先在上方快速新增一筆吧。</p>
-                    )}
-                </section>
-
-                <section className="action-deck" aria-label="換手與空間設定">
-                    <button className="swap deck-action-btn" onClick={openSwap}>
-                        One-Tap Swap
-                    </button>
-                    <div className="action-status" aria-label="求援狀態摘要">
-                        <p className="credit-pill">
-                            本週求援次數 <strong>{formatCredit(currentUserCredits)} / {HELP_CREDIT_WEEKLY_LIMIT}</strong>
-                        </p>
-                        {swapStatus && (
-                            <p className="swap-notice" aria-live="polite">{swapStatus}</p>
+                        {visibleChores.length === 0 && (
+                            <p className="calendar-empty">目前沒有工作，先在上方快速新增一筆吧。</p>
                         )}
-                    </div>
-                    <div className="settings-row">
-                        <button type="button" className="workspace-switch-trigger deck-action-btn" onClick={openSpaceSwitch}>
-                            空間管理
-                        </button>
-                        <button type="button" className="member-manage-trigger deck-action-btn" onClick={openMembers} disabled={!canManageMembers}>
-                            管理成員
-                        </button>
-                    </div>
-                    <section className="member-overview" aria-label="成員概況">
-                        {members.map((member) => (
-                            <div key={member.id} className={`member-overview-item ${member.active ? '' : 'inactive'}`}>
-                                <span className="member-overview-emoji" aria-hidden="true">{member.emoji}</span>
-                                <span className="member-overview-name">{member.name}</span>
-                                <small>{roleLabel(member.role)}</small>
-                                <small>{memberTaskCounts[member.id] || 0} tasks · 💳 {formatCredit(helpCredits[member.id] ?? 0)}</small>
-                            </div>
-                        ))}
                     </section>
-                </section>
 
-                <section className="events-panel">
-                    <div className="events-head">
-                        <strong>Usability Events</strong>
-                        <button className="link-btn" onClick={exportEvents}>
-                            Export JSON
+                    <section className="action-deck" aria-label="換手與空間設定">
+                        <button className="swap deck-action-btn" onClick={openSwap}>
+                            One-Tap Swap
                         </button>
-                    </div>
-                    <ul>
-                        {events.length === 0 && <li className="event-empty">No events yet</li>}
-                        {events.map((entry, index) => (
-                            <li key={`${entry.at}-${index}`}>
-                                <span>{entry.type}</span>
-                                <small>{new Date(entry.at).toLocaleTimeString()}</small>
-                            </li>
-                        ))}
-                    </ul>
+                        <div className="action-status" aria-label="求援狀態摘要">
+                            <p className="credit-pill">
+                                本週求援次數 <strong>{formatCredit(currentUserCredits)} / {HELP_CREDIT_WEEKLY_LIMIT}</strong>
+                            </p>
+                            {swapStatus && (
+                                <p className="swap-notice" aria-live="polite">{swapStatus}</p>
+                            )}
+                        </div>
+                        <div className="settings-row">
+                            <button type="button" className="workspace-switch-trigger deck-action-btn" onClick={openSpaceSwitch}>
+                                空間管理
+                            </button>
+                            <button type="button" className="member-manage-trigger deck-action-btn" onClick={openMembers} disabled={!canManageMembers}>
+                                管理成員
+                            </button>
+                        </div>
+                        <section className="member-overview" aria-label="成員概況">
+                            {members.map((member) => (
+                                <div key={member.id} className={`member-overview-item ${member.active ? '' : 'inactive'}`}>
+                                    <span className="member-overview-emoji" aria-hidden="true">{member.emoji}</span>
+                                    <span className="member-overview-name">{member.name}</span>
+                                    <small>{roleLabel(member.role)}</small>
+                                    <small>{memberTaskCounts[member.id] || 0} tasks · 💳 {formatCredit(helpCredits[member.id] ?? 0)}</small>
+                                </div>
+                            ))}
+                        </section>
+                    </section>
+
+                    {showEventLog && (
+                        <section className="events-panel">
+                            <div className="events-head">
+                                <strong>Usability Events</strong>
+                                <button className="link-btn" onClick={exportEvents}>
+                                    Export JSON
+                                </button>
+                            </div>
+                            <ul>
+                                {events.length === 0 && <li className="event-empty">No events yet</li>}
+                                {events.map((entry, index) => (
+                                    <li key={`${entry.at}-${index}`}>
+                                        <span>{entry.type}</span>
+                                        <small>{new Date(entry.at).toLocaleTimeString()}</small>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
                 </section>
             </main>
 

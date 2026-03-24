@@ -1232,3 +1232,226 @@ body {
         border-color: var(--glass-border);
     }
 }
+
+/* Simplified layout + RWD (iPhone 6 baseline to large desktop) */
+.page {
+    min-height: 100dvh;
+    display: block;
+    padding: clamp(10px, 2vw, 28px);
+}
+
+.app-shell {
+    width: min(100%, 2200px);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.top-panel,
+.content-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    min-width: 0;
+}
+
+.control-hub,
+.action-deck,
+.events-panel,
+.bubble,
+.calendar,
+.calendar-detail,
+.sheet {
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(15, 23, 42, 0.26);
+    box-shadow: none;
+    backdrop-filter: blur(8px);
+}
+
+.control-hub {
+    padding: 12px;
+    gap: 10px;
+}
+
+.dirtiness-card {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+.hero-side {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 14px;
+    box-shadow: none;
+}
+
+.hero-side-solo strong {
+    font-size: clamp(42px, 8vw, 58px);
+}
+
+.bubbles {
+    margin-top: 0;
+    min-width: 0;
+}
+
+.member-overview {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.member-manager-item {
+    grid-template-columns: 44px minmax(0, 1fr) minmax(88px, 108px) auto auto;
+}
+
+/* < iPhone 6 */
+@media (max-width: 374px) {
+    .page {
+        padding: 8px;
+    }
+
+    .app-shell,
+    .top-panel,
+    .content-panel {
+        gap: 10px;
+    }
+
+    .control-hub,
+    .action-deck,
+    .events-panel,
+    .calendar,
+    .bubble {
+        padding: 10px;
+    }
+
+    .calendar-grid,
+    .calendar-weekdays {
+        gap: 4px;
+    }
+
+    .calendar-cell {
+        min-height: 54px;
+        padding: 6px;
+    }
+
+    .deck-action-btn,
+    .card-actions button,
+    .add-btn,
+    .member-toggle-btn,
+    .member-delete-btn,
+    .member-add-btn {
+        height: 34px;
+        font-size: 11px;
+    }
+}
+
+/* iPhone 6 and standard phones */
+@media (min-width: 375px) and (max-width: 767px) {
+    .app-shell {
+        max-width: 520px;
+    }
+}
+
+/* Tablet */
+@media (min-width: 768px) {
+    .app-shell {
+        max-width: 1280px;
+        gap: 14px;
+    }
+
+    .top-panel {
+        grid-template-columns: 1fr;
+        align-items: start;
+    }
+
+    .content-panel {
+        grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+        align-items: start;
+        grid-auto-rows: min-content;
+    }
+
+    .content-panel .bubbles {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+    }
+
+    .content-panel .action-deck {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .content-panel .events-panel {
+        grid-column: 2;
+        grid-row: 2;
+        margin-top: 0;
+    }
+
+    .events-panel ul {
+        max-height: 260px;
+    }
+}
+
+/* Desktop */
+@media (min-width: 1280px) {
+    .app-shell {
+        max-width: 1680px;
+        gap: 16px;
+    }
+
+    .content-panel {
+        grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.75fr);
+    }
+
+    .events-panel {
+        position: sticky;
+        top: 16px;
+    }
+}
+
+/* Large display (up to 32") */
+@media (min-width: 1920px) {
+    .page {
+        padding: 28px;
+    }
+
+    .app-shell {
+        max-width: 2200px;
+        gap: 18px;
+    }
+
+    .content-panel {
+        grid-template-columns: minmax(0, 1.6fr) minmax(380px, 0.7fr);
+    }
+
+    .control-hub,
+    .action-deck,
+    .events-panel,
+    .bubble,
+    .calendar {
+        border-radius: 16px;
+    }
+}
+
+@media (max-width: 1023px) {
+    .member-manager-item {
+        grid-template-columns: 44px minmax(0, 1fr);
+    }
+
+    .member-role-select,
+    .member-toggle-btn,
+    .member-delete-btn {
+        grid-column: span 1;
+    }
+
+    .member-add-form {
+        grid-template-columns: 44px minmax(0, 1fr);
+    }
+
+    .member-add-btn {
+        grid-column: 1 / -1;
+    }
+}
