@@ -158,10 +158,17 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 999px;
     padding: 4px 10px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     background: rgba(255, 255, 255, 0.1);
     white-space: nowrap;
+}
+
+.workspace-chip-button {
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1.2;
 }
 
 .workspace-user {
@@ -1141,14 +1148,14 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 36vh;
+    max-height: min(42dvh, 420px);
     overflow: auto;
     margin-bottom: 10px;
 }
 
 .member-manager-item {
     display: grid;
-    grid-template-columns: 44px 1fr 96px auto auto;
+    grid-template-columns: 44px minmax(0, 1fr) minmax(92px, 110px) auto auto;
     gap: 8px;
     align-items: center;
 }
@@ -1183,6 +1190,7 @@ body {
     cursor: pointer;
     padding: 0 10px;
     font-size: 12px;
+    white-space: nowrap;
 }
 
 .member-toggle-btn.active {
@@ -1200,6 +1208,61 @@ body {
     grid-template-columns: 44px 1fr auto;
     gap: 8px;
     margin-top: 4px;
+}
+
+.create-space-owner-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.create-space-submit-btn {
+    min-width: 110px;
+}
+
+.sheet-create-space {
+    width: min(700px, calc(100% - 48px));
+    padding: 22px 22px 24px;
+}
+
+.sheet-create-space h3 {
+    margin: 0 0 12px;
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.sheet-create-space .hub-context {
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.create-space-form {
+    gap: 14px;
+}
+
+.create-space-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.create-space-form .chore-input {
+    min-height: 46px;
+    font-size: 15px;
+    padding: 10px 12px;
+}
+
+.create-space-owner-label {
+    margin: 2px 0 0;
+}
+
+.sheet-create-space .sheet-actions {
+    margin-top: 14px;
 }
 
 .member-targets {
@@ -1284,6 +1347,7 @@ body {
     display: grid;
     align-items: end;
     justify-items: center;
+    z-index: 1200;
 }
 
 .sheet {
@@ -1345,6 +1409,29 @@ body {
     background: rgba(196, 241, 255, 0.18);
 }
 
+.management-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.management-tab {
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.management-tab.active {
+    border-color: rgba(196, 241, 255, 0.85);
+    background: rgba(196, 241, 255, 0.16);
+}
+
 .owner-display {
     margin: 0;
     display: flex;
@@ -1401,6 +1488,49 @@ body {
     min-height: 100dvh;
     display: block;
     padding: clamp(10px, 2vw, 28px);
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.page>*:not(.modal) {
+    position: relative;
+    z-index: 1;
+}
+
+.page::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+    transform: translate3d(0, 0, 0);
+    animation: weatherDrift 10s ease-in-out infinite alternate;
+}
+
+.weather-sunny::before {
+    background:
+        radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.22), transparent 38%),
+        radial-gradient(circle at 78% 34%, rgba(253, 224, 71, 0.28), transparent 42%);
+}
+
+.weather-cloudy::before {
+    background:
+        radial-gradient(ellipse at 22% 30%, rgba(226, 232, 240, 0.18), transparent 48%),
+        radial-gradient(ellipse at 70% 40%, rgba(148, 163, 184, 0.2), transparent 52%);
+}
+
+.weather-overcast::before {
+    background:
+        radial-gradient(ellipse at 30% 35%, rgba(148, 163, 184, 0.18), transparent 55%),
+        radial-gradient(ellipse at 72% 50%, rgba(100, 116, 139, 0.22), transparent 58%);
+}
+
+.weather-rainy::before {
+    background:
+        radial-gradient(circle at 70% 25%, rgba(125, 211, 252, 0.14), transparent 42%);
+    animation-duration: 7s;
 }
 
 .app-shell {
@@ -1436,6 +1566,10 @@ body {
 .control-hub {
     padding: 12px;
     gap: 10px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
 }
 
 .dirtiness-card {
@@ -1447,11 +1581,16 @@ body {
 }
 
 .hero-side {
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.08);
-    padding: 14px;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    padding: 2px 0;
     box-shadow: none;
+}
+
+.dirtiness-toggle-btn {
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(15, 23, 42, 0.24);
 }
 
 .hero-side-solo strong {
@@ -1556,6 +1695,19 @@ body {
     .events-panel ul {
         max-height: 260px;
     }
+
+    .modal {
+        align-items: center;
+        padding: 20px;
+    }
+
+    .sheet {
+        width: min(640px, calc(100% - 48px));
+        max-height: min(80dvh, 720px);
+        overflow: auto;
+        border-radius: 16px;
+        padding: 16px 16px 18px;
+    }
 }
 
 /* Desktop */
@@ -1601,13 +1753,37 @@ body {
 
 @media (max-width: 1023px) {
     .member-manager-item {
-        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-columns: 44px minmax(0, 1fr) minmax(88px, 1fr);
+        grid-template-areas:
+            "emoji name role"
+            "toggle toggle delete";
+        align-items: stretch;
+    }
+
+    .member-manager-item>.member-emoji-input {
+        grid-area: emoji;
+    }
+
+    .member-manager-item>.member-name-input {
+        grid-area: name;
+    }
+
+    .member-manager-item>.member-role-select {
+        grid-area: role;
+    }
+
+    .member-manager-item>.member-toggle-btn {
+        grid-area: toggle;
+    }
+
+    .member-manager-item>.member-delete-btn {
+        grid-area: delete;
     }
 
     .member-role-select,
     .member-toggle-btn,
     .member-delete-btn {
-        grid-column: span 1;
+        width: 100%;
     }
 
     .member-add-form {
@@ -1616,5 +1792,58 @@ body {
 
     .member-add-btn {
         grid-column: 1 / -1;
+    }
+
+    .create-space-owner-row {
+        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-areas:
+            "emoji owner"
+            "submit submit";
+    }
+
+    .create-space-owner-row>.member-emoji-input {
+        grid-area: emoji;
+    }
+
+    .create-space-owner-row>.owner-display {
+        grid-area: owner;
+    }
+
+    .create-space-owner-row>.create-space-submit-btn {
+        grid-area: submit;
+        width: 100%;
+    }
+
+    .sheet-create-space {
+        width: min(640px, calc(100% - 28px));
+        padding: 18px 16px 20px;
+    }
+
+    .sheet-create-space h3 {
+        font-size: 22px;
+    }
+
+    .create-space-field {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 767px) {
+    .member-manager-item {
+        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-areas:
+            "emoji name"
+            "role role"
+            "toggle delete";
+    }
+}
+
+@keyframes weatherDrift {
+    0% {
+        transform: translate3d(-1.5%, -1%, 0) scale(1);
+    }
+
+    100% {
+        transform: translate3d(1.5%, 1%, 0) scale(1.04);
     }
 }
