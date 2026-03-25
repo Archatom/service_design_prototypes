@@ -47,14 +47,24 @@ function isSameMonth(a, b) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
-function homeClimateFrom(chores) {
+function homeClimateFrom(chores, slideProgressById = {}, pendingCompletionById = {}) {
     const totalWeight = chores.reduce((sum, item) => sum + item.weight, 0);
-    const pendingWeight = chores.filter((item) => !item.done).reduce((sum, item) => sum + item.weight, 0);
-    const completedWeight = totalWeight - pendingWeight;
-    const completedCount = chores.filter((item) => item.done).length;
-    const pendingCount = chores.length - completedCount;
+    const completionRatioById = Object.fromEntries(
+        chores.map((item) => {
+            if (item.done || pendingCompletionById[item.id]) return [item.id, 1];
+            const progress = Number(slideProgressById[item.id]);
+            const normalized = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) / 100 : 0;
+            return [item.id, normalized];
+        }),
+    );
+
+    const completedWeight = chores.reduce((sum, item) => sum + item.weight * (completionRatioById[item.id] || 0), 0);
+    const pendingWeight = Math.max(0, totalWeight - completedWeight);
+    const completedCount = chores.reduce((sum, item) => sum + (completionRatioById[item.id] || 0), 0);
+    const pendingCount = Math.max(0, chores.length - completedCount);
 
     const harmonyScore = totalWeight === 0 ? 100 : round((completedWeight / totalWeight) * 100);
+    const cleanlinessScore = harmonyScore;
     const dirtinessScore = 100 - harmonyScore;
     const clutterFeelsLike = Math.min(100, round(dirtinessScore * 0.7 + pendingCount * 10));
     const recoveryPotential = Math.max(0, 100 - clutterFeelsLike);
@@ -66,6 +76,7 @@ function homeClimateFrom(chores) {
         completedCount,
         pendingCount,
         harmonyScore,
+        cleanlinessScore,
         dirtinessScore,
         clutterFeelsLike,
         recoveryPotential,
@@ -86,6 +97,7 @@ function monthDailyStats(chores, monthDate) {
         const completedCount = doneToday.length;
         const pendingCount = Math.max(0, totalCount - completedCount);
         const harmonyScore = totalWeight === 0 ? 100 : round((completedWeight / totalWeight) * 100);
+        const cleanlinessScore = harmonyScore;
         const dirtinessScore = 100 - harmonyScore;
         const clutterFeelsLike = Math.min(100, round(dirtinessScore * 0.7 + pendingCount * 10));
         const recoveryPotential = Math.max(0, 100 - clutterFeelsLike);
@@ -97,6 +109,7 @@ function monthDailyStats(chores, monthDate) {
             completedCount,
             pendingCount,
             harmonyScore,
+            cleanlinessScore,
             dirtinessScore,
             clutterFeelsLike,
             recoveryPotential,
@@ -305,15 +318,10 @@ export default function App() {
     const currentUser = memberById[currentUserId] || null;
     const canManageMembers = currentUser?.role === 'owner' || currentUser?.role === 'admin';
 
-    const choresForClimate = useMemo(
-        () => chores.map((chore) => (
-            !chore.done && completionUndoById[chore.id]
-                ? { ...chore, done: true }
-                : chore
-        )),
-        [chores, completionUndoById],
+    const climate = useMemo(
+        () => homeClimateFrom(chores, completionSlideById, completionUndoById),
+        [chores, completionSlideById, completionUndoById],
     );
-    const climate = useMemo(() => homeClimateFrom(choresForClimate), [choresForClimate]);
     const weather = useMemo(() => weatherFromDirtiness(climate.dirtinessScore), [climate.dirtinessScore]);
     const weatherIcon = useMemo(() => weatherIconFrom(weather), [weather]);
     const activeDate = useMemo(
@@ -361,6 +369,12 @@ export default function App() {
         ];
     }, [monthDays, monthStats, selectedMonth]);
     const selectedDayStats = selectedDayKey ? monthStats[selectedDayKey] : null;
+    const isViewingToday = useMemo(() => isSameDay(activeDate, new Date()), [activeDate]);
+    const displayCleanlinessScore = useMemo(() => {
+        if (isViewingToday) return climate.cleanlinessScore;
+        return selectedDayStats?.cleanlinessScore ?? climate.cleanlinessScore;
+    }, [isViewingToday, selectedDayStats, climate.cleanlinessScore]);
+    const todayKey = useMemo(() => dateKeyLocal(new Date()), []);
     const selectedDateLabel = useMemo(() => {
         const date = activeDate;
         return date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' });
@@ -1352,14 +1366,14 @@ export default function App() {
                             </div>
                         </div>
 
-                        <section className="dirtiness-card hub-panel" aria-label="髒亂指數與每月進度">
+                        <section className="dirtiness-card hub-panel" aria-label="乾淨指數與每月進度">
                             <div className="dirtiness-head">
                                 <div className="hero-side hero-side-solo">
                                     <p className="hero-icon">
                                         <span className="hero-icon-mark" aria-hidden="true">{weatherIcon}</span>
-                                        <span className="hero-icon-text">髒亂指數</span>
+                                        <span className="hero-icon-text">乾淨指數</span>
                                     </p>
-                                    <strong>{selectedDayStats ? `${selectedDayStats.dirtinessScore}%` : `${climate.dirtinessScore}%`}</strong>
+                                    <strong>{`${displayCleanlinessScore}%`}</strong>
                                     <p className="hero-hint">{selectedDateLabel} · 待處理 {pending.length} 件</p>
                                 </div>
                                 <button
@@ -1405,7 +1419,11 @@ export default function App() {
                                                     aria-pressed={selectedDayKey === cell.key}
                                                 >
                                                     <span className="calendar-day">{cell.date.getDate()}</span>
-                                                    <span className="calendar-metric">{cell.stats ? `${cell.stats.dirtinessScore}%` : '--'}</span>
+                                                    <span className="calendar-metric">
+                                                        {cell.stats
+                                                            ? `${cell.key === todayKey ? climate.cleanlinessScore : cell.stats.cleanlinessScore}%`
+                                                            : '--'}
+                                                    </span>
                                                 </button>
                                             ) : (
                                                 <span key={`blank-${idx}`} className="calendar-cell placeholder" aria-hidden="true" />
@@ -1413,10 +1431,10 @@ export default function App() {
                                         )}
                                     </div>
                                     <div className="calendar-legend">
-                                        <span className="legend-item"><span className="dot sunny" /> 晴 ≤ 20</span>
-                                        <span className="legend-item"><span className="dot cloudy" /> 多雲 ≤ 45</span>
-                                        <span className="legend-item"><span className="dot overcast" /> 陰 ≤ 70</span>
-                                        <span className="legend-item"><span className="dot rainy" /> 雨 &gt; 70</span>
+                                        <span className="legend-item"><span className="dot sunny" /> 晴 ≥ 80</span>
+                                        <span className="legend-item"><span className="dot cloudy" /> 多雲 ≥ 55</span>
+                                        <span className="legend-item"><span className="dot overcast" /> 陰 ≥ 30</span>
+                                        <span className="legend-item"><span className="dot rainy" /> 雨 &lt; 30</span>
                                     </div>
                                 </div>
                             )}
