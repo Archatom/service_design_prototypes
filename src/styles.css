@@ -1396,6 +1396,46 @@ body {
 .space-sheet-item {
     position: relative;
     gap: 6px;
+    cursor: default;
+}
+
+.space-member-preview {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.space-member-pill {
+    min-width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.space-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.space-card-btn {
+    height: 32px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
 }
 
 .space-current-tag {
@@ -1407,29 +1447,6 @@ body {
     border-radius: 999px;
     padding: 1px 6px;
     background: rgba(196, 241, 255, 0.18);
-}
-
-.management-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.management-tab {
-    height: 34px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.management-tab.active {
-    border-color: rgba(196, 241, 255, 0.85);
-    background: rgba(196, 241, 255, 0.16);
 }
 
 .owner-display {
@@ -1835,6 +1852,10 @@ body {
             "emoji name"
             "role role"
             "toggle delete";
+    }
+
+    .space-card-actions {
+        grid-template-columns: 1fr;
     }
 }
 

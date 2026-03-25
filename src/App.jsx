@@ -266,7 +266,7 @@ export default function App() {
     const [helpCredits, setHelpCredits] = useState(initialHelpCredits);
     const [helpCreditsWeekKey, setHelpCreditsWeekKey] = useState(initialWeekKey);
     const [managementOpen, setManagementOpen] = useState(false);
-    const [managementTab, setManagementTab] = useState('space');
+    const [scopedMembersSpaceId, setScopedMembersSpaceId] = useState(null);
     const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
     const [swapOpen, setSwapOpen] = useState(false);
     const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -316,7 +316,25 @@ export default function App() {
         [members],
     );
     const currentUser = memberById[currentUserId] || null;
-    const canManageMembers = currentUser?.role === 'owner' || currentUser?.role === 'admin';
+    const scopedMembersSpace = useMemo(
+        () => (scopedMembersSpaceId ? spaces.find((item) => item.id === scopedMembersSpaceId) || null : null),
+        [scopedMembersSpaceId, spaces],
+    );
+    const scopedMembers = scopedMembersSpace?.members || [];
+    const scopedMemberById = useMemo(
+        () => Object.fromEntries(scopedMembers.map((member) => [member.id, member])),
+        [scopedMembers],
+    );
+    const scopedCurrentUserId = useMemo(
+        () => (scopedMembersSpace ? scopedMembersSpace.currentUserId || resolveCurrentUserId(scopedMembers, accountUser.id) : null),
+        [scopedMembersSpace, scopedMembers],
+    );
+    const scopedCurrentUser = scopedCurrentUserId ? scopedMemberById[scopedCurrentUserId] || null : null;
+    const canManageScopedMembers = scopedCurrentUser?.role === 'owner' || scopedCurrentUser?.role === 'admin';
+    const scopedActiveMembers = useMemo(
+        () => scopedMembers.filter((member) => member.active),
+        [scopedMembers],
+    );
 
     const climate = useMemo(
         () => homeClimateFrom(chores, completionSlideById, completionUndoById),
@@ -776,15 +794,10 @@ export default function App() {
         });
     };
 
-    const openManagement = (tab = 'space') => {
-        if (tab === 'members' && !canManageMembers) {
-            setSwapStatus('你目前是 Member，僅 Owner/Admin 可管理人員');
-            return;
-        }
-        setManagementTab(tab);
+    const openManagement = () => {
         setMemberError('');
         setManagementOpen(true);
-        track('management_center_open', { tab });
+        track('management_center_open', { tab: 'space' });
     };
 
     const closeManagement = () => {
@@ -793,21 +806,60 @@ export default function App() {
         track('management_center_close');
     };
 
-    const addMember = (event) => {
+    const openScopedMembers = (spaceId) => {
+        const targetSpace = spaces.find((item) => item.id === spaceId);
+        if (!targetSpace) return;
+        const targetCurrentUserId = targetSpace.currentUserId || resolveCurrentUserId(targetSpace.members, accountUser.id);
+        const targetCurrentUser = targetSpace.members.find((member) => member.id === targetCurrentUserId) || null;
+        const allowManage = targetCurrentUser?.role === 'owner' || targetCurrentUser?.role === 'admin';
+        if (!allowManage) {
+            setSwapStatus('你在此空間是 Member，僅 Owner/Admin 可管理人員');
+            return;
+        }
+
+        setManagementOpen(false);
+        setScopedMembersSpaceId(spaceId);
+        setNewMemberName('');
+        setNewMemberEmoji('🙂');
+        setMemberError('');
+        track('space_member_manage_open', { spaceId, spaceName: targetSpace.name });
+    };
+
+    const closeScopedMembers = () => {
+        setScopedMembersSpaceId(null);
+        setMemberError('');
+        track('space_member_manage_close');
+    };
+
+    const updateScopedSpaceSnapshot = (spaceId, updater) => {
+        const targetSpace = spaces.find((item) => item.id === spaceId);
+        if (!targetSpace) return null;
+        const nextSpace = updater(targetSpace);
+        setSpaces((prev) => prev.map((item) => (item.id === spaceId ? nextSpace : item)));
+        if (spaceId === workspace.id) {
+            setMembers(nextSpace.members);
+            setHelpCredits(nextSpace.helpCredits || {});
+            const nextCurrentUserId = nextSpace.currentUserId || resolveCurrentUserId(nextSpace.members, accountUser.id);
+            setCurrentUserId(nextCurrentUserId);
+        }
+        return nextSpace;
+    };
+
+    const addScopedMember = (event) => {
         event.preventDefault();
-        if (!canManageMembers) {
+        if (!scopedMembersSpace) return;
+        if (!canManageScopedMembers) {
             setMemberError('僅 Owner/Admin 可新增成員');
             return;
         }
+
         const normalizedName = newMemberName.trim();
         const normalizedEmoji = newMemberEmoji.trim();
-
         if (!normalizedName) {
             setMemberError('請輸入成員名稱');
             return;
         }
-
-        if (members.some((member) => member.name.toLowerCase() === normalizedName.toLowerCase())) {
+        if (scopedMembers.some((member) => member.name.toLowerCase() === normalizedName.toLowerCase())) {
             setMemberError('成員名稱不可重複');
             return;
         }
@@ -820,129 +872,160 @@ export default function App() {
             role: 'member',
         };
 
-        setMembers((prev) => [...prev, member]);
-        setHelpCredits((prev) => ({
-            ...prev,
-            [member.id]: HELP_CREDIT_WEEKLY_LIMIT,
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => ({
+            ...space,
+            members: [...space.members, member],
+            helpCredits: {
+                ...(space.helpCredits || {}),
+                [member.id]: HELP_CREDIT_WEEKLY_LIMIT,
+            },
         }));
+
         setNewMemberName('');
         setNewMemberEmoji('🙂');
         setMemberError('');
-        setSwapStatus(`已新增成員：${member.name}`);
-        track('member_add', { memberId: member.id, name: member.name });
+        setSwapStatus(`已在「${scopedMembersSpace.name}」新增成員：${member.name}`);
+        track('member_add', { memberId: member.id, name: member.name, spaceId: scopedMembersSpace.id, spaceName: scopedMembersSpace.name });
     };
 
-    const updateMemberName = (memberId, nextName) => {
-        if (!canManageMembers) return;
-        setMembers((prev) => prev.map((member) => (member.id === memberId ? { ...member, name: nextName } : member)));
+    const updateScopedMemberName = (memberId, nextName) => {
+        if (!canManageScopedMembers || !scopedMembersSpace) return;
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => ({
+            ...space,
+            members: space.members.map((member) => (member.id === memberId ? { ...member, name: nextName } : member)),
+        }));
     };
 
-    const commitMemberName = (memberId, rawName) => {
-        if (!canManageMembers) {
+    const commitScopedMemberName = (memberId, rawName) => {
+        if (!scopedMembersSpace) return;
+        if (!canManageScopedMembers) {
             setMemberError('僅 Owner/Admin 可修改成員');
             return;
         }
+
         const normalizedName = rawName.trim();
         if (!normalizedName) {
             setMemberError('成員名稱不可為空');
             return;
         }
-        if (members.some((member) => member.id !== memberId && member.name.toLowerCase() === normalizedName.toLowerCase())) {
+        if (scopedMembers.some((member) => member.id !== memberId && member.name.toLowerCase() === normalizedName.toLowerCase())) {
             setMemberError('成員名稱不可重複');
             return;
         }
-        setMembers((prev) => prev.map((member) => (member.id === memberId ? { ...member, name: normalizedName } : member)));
+
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => ({
+            ...space,
+            members: space.members.map((member) => (member.id === memberId ? { ...member, name: normalizedName } : member)),
+        }));
         setMemberError('');
-        track('member_edit_name', { memberId, name: normalizedName });
+        track('member_edit_name', { memberId, name: normalizedName, spaceId: scopedMembersSpace.id, spaceName: scopedMembersSpace.name });
     };
 
-    const updateMemberEmoji = (memberId, nextEmoji) => {
-        if (!canManageMembers) return;
+    const updateScopedMemberEmoji = (memberId, nextEmoji) => {
+        if (!canManageScopedMembers || !scopedMembersSpace) return;
         const normalizedEmoji = nextEmoji.trim();
-        setMembers((prev) => prev.map((member) => (member.id === memberId ? { ...member, emoji: normalizedEmoji || '🙂' } : member)));
-        track('member_edit_emoji', { memberId });
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => ({
+            ...space,
+            members: space.members.map((member) => (member.id === memberId ? { ...member, emoji: normalizedEmoji || '🙂' } : member)),
+        }));
+        track('member_edit_emoji', { memberId, spaceId: scopedMembersSpace.id, spaceName: scopedMembersSpace.name });
     };
 
-    const updateMemberRole = (memberId, nextRole) => {
-        if (currentUser?.role !== 'owner') {
+    const updateScopedMemberRole = (memberId, nextRole) => {
+        if (!scopedMembersSpace) return;
+        if (scopedCurrentUser?.role !== 'owner') {
             setMemberError('僅 Owner 可調整角色');
             return;
         }
 
-        const target = members.find((member) => member.id === memberId);
+        const target = scopedMembers.find((member) => member.id === memberId);
         if (!target) return;
         if (target.role === 'owner') {
             setMemberError('Owner 角色不可變更');
             return;
         }
 
-        setMembers((prev) => prev.map((member) => (member.id === memberId ? { ...member, role: nextRole } : member)));
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => ({
+            ...space,
+            members: space.members.map((member) => (member.id === memberId ? { ...member, role: nextRole } : member)),
+        }));
         setMemberError('');
-        track('member_edit_role', { memberId, role: nextRole });
+        track('member_edit_role', { memberId, role: nextRole, spaceId: scopedMembersSpace.id, spaceName: scopedMembersSpace.name });
     };
 
-    const toggleMemberActive = (memberId) => {
-        if (!canManageMembers) {
+    const toggleScopedMemberActive = (memberId) => {
+        if (!scopedMembersSpace) return;
+        if (!canManageScopedMembers) {
             setMemberError('僅 Owner/Admin 可停用成員');
             return;
         }
-        const target = members.find((member) => member.id === memberId);
-        if (!target) return;
 
+        const target = scopedMembers.find((member) => member.id === memberId);
+        if (!target) return;
         if (target.role === 'owner') {
             setMemberError('Owner 不可停用');
             return;
         }
 
-        if (target.active && activeMembers.length <= 1) {
+        if (target.active && scopedActiveMembers.length <= 1) {
             setMemberError('至少需要一位啟用中的成員');
             return;
         }
 
-        const assignedCount = chores.filter((item) => item.assigneeId === memberId).length;
+        const scopedChores = scopedMembersSpace.chores || [];
+        const assignedCount = scopedChores.filter((item) => item.assigneeId === memberId).length;
         if (target.active && assignedCount > 0) {
             setMemberError(`「${target.name}」仍有 ${assignedCount} 筆任務，請先重指派`);
             return;
         }
 
-        setMembers((prev) => prev.map((member) => (member.id === memberId ? { ...member, active: !member.active } : member)));
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => ({
+            ...space,
+            members: space.members.map((member) => (member.id === memberId ? { ...member, active: !member.active } : member)),
+        }));
         setMemberError('');
-        track('member_toggle_active', { memberId, active: !target.active });
+        track('member_toggle_active', { memberId, active: !target.active, spaceId: scopedMembersSpace.id, spaceName: scopedMembersSpace.name });
     };
 
-    const deleteMember = (memberId) => {
-        if (!canManageMembers) {
+    const deleteScopedMember = (memberId) => {
+        if (!scopedMembersSpace) return;
+        if (!canManageScopedMembers) {
             setMemberError('僅 Owner/Admin 可刪除成員');
             return;
         }
-        const target = members.find((member) => member.id === memberId);
-        if (!target) return;
 
+        const target = scopedMembers.find((member) => member.id === memberId);
+        if (!target) return;
         if (target.role === 'owner') {
             setMemberError('Owner 不可刪除');
             return;
         }
-
-        if (target.id === currentUserId) {
+        if (target.id === scopedCurrentUserId) {
             setMemberError('不可刪除目前登入使用者');
             return;
         }
 
-        const assignedCount = chores.filter((item) => item.assigneeId === memberId).length;
+        const scopedChores = scopedMembersSpace.chores || [];
+        const assignedCount = scopedChores.filter((item) => item.assigneeId === memberId).length;
         if (assignedCount > 0) {
             setMemberError(`「${target.name}」仍有 ${assignedCount} 筆任務，請先重指派`);
             return;
         }
 
-        setMembers((prev) => prev.filter((member) => member.id !== memberId));
-        setHelpCredits((prev) => {
-            const next = { ...prev };
-            delete next[memberId];
-            return next;
+        updateScopedSpaceSnapshot(scopedMembersSpace.id, (space) => {
+            const nextHelpCredits = { ...(space.helpCredits || {}) };
+            delete nextHelpCredits[memberId];
+            return {
+                ...space,
+                members: space.members.filter((member) => member.id !== memberId),
+                helpCredits: nextHelpCredits,
+                currentUserId: resolveCurrentUserId(space.members.filter((member) => member.id !== memberId), accountUser.id),
+            };
         });
+
         setMemberError('');
-        setSwapStatus(`已刪除成員：${target.name}`);
-        track('member_delete', { memberId, name: target.name });
+        setSwapStatus(`已在「${scopedMembersSpace.name}」刪除成員：${target.name}`);
+        track('member_delete', { memberId, name: target.name, spaceId: scopedMembersSpace.id, spaceName: scopedMembersSpace.name });
     };
 
     const switchWorkspace = (workspaceId) => {
@@ -987,6 +1070,7 @@ export default function App() {
         setSwapOpen(false);
         setSwapSubmitting(false);
         setManagementOpen(false);
+        setScopedMembersSpaceId(null);
         setQuickAddOpen(false);
         setCreateSpaceOpen(false);
         setEditingChoreId(null);
@@ -1016,18 +1100,16 @@ export default function App() {
         setNewOwnerEmoji(currentUser?.emoji || '🙂');
         setSpaceError('');
         setManagementOpen(false);
+        setScopedMembersSpaceId(null);
         setCreateSpaceOpen(true);
         track('workspace_create_open');
     };
 
-    const closeCreateSpace = (backToManagement = true) => {
+    const closeCreateSpace = () => {
         setCreateSpaceOpen(false);
         setSpaceError('');
-        if (backToManagement) {
-            setManagementTab('space');
-            setManagementOpen(true);
-        }
-        track('workspace_create_close', { backToManagement });
+        setManagementOpen(true);
+        track('workspace_create_close', { backToManagement: true });
     };
 
     const createWorkspace = (event) => {
@@ -1081,6 +1163,7 @@ export default function App() {
         setSwapOpen(false);
         setSwapSubmitting(false);
         setManagementOpen(false);
+        setScopedMembersSpaceId(null);
         setQuickAddOpen(false);
         setEditingChoreId(null);
         setDeleteConfirmId(null);
@@ -1352,7 +1435,7 @@ export default function App() {
                     <section className="control-hub" aria-label="顯示與新增控制中心">
                         <div className="hub-head">
                             <div className="hub-title-row">
-                                <button type="button" className="workspace-chip workspace-chip-button" onClick={() => openManagement('space')}>
+                                <button type="button" className="workspace-chip workspace-chip-button" onClick={openManagement}>
                                     {workspace.name}
                                 </button>
                                 <span
@@ -1735,139 +1818,147 @@ export default function App() {
                 <div className="modal" onClick={closeManagement}>
                     <div className="sheet" onClick={(e) => e.stopPropagation()}>
                         <h3>管理中心</h3>
-                        <div className="management-tabs" role="tablist" aria-label="管理中心分頁">
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={managementTab === 'space'}
-                                className={`management-tab ${managementTab === 'space' ? 'active' : ''}`}
-                                onClick={() => setManagementTab('space')}
-                            >
-                                空間管理
-                            </button>
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={managementTab === 'members'}
-                                className={`management-tab ${managementTab === 'members' ? 'active' : ''}`}
-                                onClick={() => canManageMembers && setManagementTab('members')}
-                                disabled={!canManageMembers}
-                            >
-                                成員管理
-                            </button>
-                        </div>
-
-                        {managementTab === 'space' ? (
-                            <>
-                                <div className="sheet-list space-sheet-list">
-                                    {spaces.map((item) => {
-                                        const memberForAccount = item.members.find((member) => member.userId === accountUser.id);
-                                        const role = memberForAccount?.role || 'member';
-                                        const memberCount = item.members.length;
-                                        const choreCount = item.chores.length;
-                                        return (
+                        <div className="sheet-list space-sheet-list">
+                            {spaces.map((item) => {
+                                const memberForAccount = item.members.find((member) => member.userId === accountUser.id);
+                                const role = memberForAccount?.role || 'member';
+                                const canManageThisSpace = role === 'owner' || role === 'admin';
+                                const memberCount = item.members.length;
+                                const choreCount = item.chores.length;
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className={`sheet-item space-sheet-item ${item.id === workspace.id ? 'active' : ''}`}
+                                    >
+                                        <strong>{item.name}</strong>
+                                        <small>{roleLabel(role)} · 成員 {memberCount} · 任務 {choreCount}</small>
+                                        <div className="space-member-preview" aria-label={`${item.name} 成員預覽`}>
+                                            {item.members.slice(0, 5).map((member) => (
+                                                <span key={member.id} className="space-member-pill" title={member.name}>
+                                                    {member.emoji}
+                                                </span>
+                                            ))}
+                                            {item.members.length > 5 && <span className="space-member-pill">+{item.members.length - 5}</span>}
+                                        </div>
+                                        <div className="space-card-actions">
                                             <button
-                                                key={item.id}
-                                                className={`sheet-item space-sheet-item ${item.id === workspace.id ? 'active' : ''}`}
+                                                type="button"
+                                                className="space-card-btn"
                                                 onClick={() => switchWorkspace(item.id)}
+                                                disabled={item.id === workspace.id}
                                             >
-                                                <strong>{item.name}</strong>
-                                                <small>{roleLabel(role)} · 成員 {memberCount} · 任務 {choreCount}</small>
-                                                {item.id === workspace.id && <span className="space-current-tag">當前</span>}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <div className="sheet-actions">
-                                    <button onClick={openCreateSpace}>＋ 建立新空間</button>
-                                    <button onClick={closeManagement}>關閉</button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <p className="hub-context">
-                                    目前使用者：{currentUser ? `${currentUser.name} (${roleLabel(currentUser.role)})` : '未設定'}
-                                </p>
-                                <div className="member-manager-list">
-                                    {members.map((member) => (
-                                        <div key={member.id} className="member-manager-item">
-                                            <input
-                                                className="member-emoji-input"
-                                                value={member.emoji}
-                                                onChange={(e) => updateMemberEmoji(member.id, e.target.value)}
-                                                maxLength={2}
-                                                disabled={!canManageMembers || member.role === 'owner'}
-                                                aria-label={`${member.name} emoji`}
-                                            />
-                                            <input
-                                                className="chore-input member-name-input"
-                                                value={member.name}
-                                                onChange={(e) => updateMemberName(member.id, e.target.value)}
-                                                onBlur={(e) => commitMemberName(member.id, e.target.value)}
-                                                disabled={!canManageMembers || member.role === 'owner'}
-                                            />
-                                            <select
-                                                className="chore-select member-role-select"
-                                                value={member.role}
-                                                onChange={(e) => updateMemberRole(member.id, e.target.value)}
-                                                disabled={currentUser?.role !== 'owner' || member.role === 'owner'}
-                                            >
-                                                <option value="owner">Owner</option>
-                                                <option value="admin">Admin</option>
-                                                <option value="member">Member</option>
-                                            </select>
-                                            <button
-                                                type="button"
-                                                className={`member-toggle-btn ${member.active ? 'active' : ''}`}
-                                                onClick={() => toggleMemberActive(member.id)}
-                                                disabled={!canManageMembers || member.role === 'owner'}
-                                            >
-                                                {member.active ? '啟用中' : '已停用'}
+                                                {item.id === workspace.id ? '目前空間' : '切換空間'}
                                             </button>
                                             <button
                                                 type="button"
-                                                className="member-delete-btn"
-                                                onClick={() => deleteMember(member.id)}
-                                                disabled={!canManageMembers || member.role === 'owner' || member.id === currentUserId}
+                                                className="space-card-btn"
+                                                onClick={() => openScopedMembers(item.id)}
+                                                disabled={!canManageThisSpace}
+                                                title={canManageThisSpace ? `管理「${item.name}」成員` : '你在此空間無管理權限'}
                                             >
-                                                刪除
+                                                管理成員
                                             </button>
                                         </div>
-                                    ))}
-                                </div>
-
-                                <form className="member-add-form" onSubmit={addMember}>
-                                    <input
-                                        className="member-emoji-input"
-                                        value={newMemberEmoji}
-                                        onChange={(e) => setNewMemberEmoji(e.target.value)}
-                                        maxLength={2}
-                                        disabled={!canManageMembers}
-                                        aria-label="new member emoji"
-                                    />
-                                    <input
-                                        className="chore-input member-name-input"
-                                        value={newMemberName}
-                                        onChange={(e) => setNewMemberName(e.target.value)}
-                                        placeholder="新增成員名稱"
-                                        disabled={!canManageMembers}
-                                    />
-                                    <button type="submit" className="member-add-btn" disabled={!canManageMembers}>新增成員</button>
-                                </form>
-                                {memberError && <p className="form-error">{memberError}</p>}
-                                <div className="sheet-actions">
-                                    <button onClick={closeManagement}>完成</button>
-                                </div>
-                            </>
-                        )}
+                                        {item.id === workspace.id && <span className="space-current-tag">當前</span>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="sheet-actions">
+                            <button onClick={openCreateSpace}>＋ 建立新空間</button>
+                            <button onClick={closeManagement}>關閉</button>
+                        </div>
                     </div>
                 </div>
             )
             }
 
             {
+                scopedMembersSpace && (
+                    <div className="modal" onClick={closeScopedMembers}>
+                        <div className="sheet" onClick={(e) => e.stopPropagation()}>
+                            <h3>成員管理：{scopedMembersSpace.name}</h3>
+                            <p className="hub-context">
+                                你的角色：{scopedCurrentUser ? `${scopedCurrentUser.name} (${roleLabel(scopedCurrentUser.role)})` : '未設定'}
+                            </p>
+                            <div className="member-manager-list">
+                                {scopedMembers.map((member) => (
+                                    <div key={member.id} className="member-manager-item">
+                                        <input
+                                            className="member-emoji-input"
+                                            value={member.emoji}
+                                            onChange={(e) => updateScopedMemberEmoji(member.id, e.target.value)}
+                                            maxLength={2}
+                                            disabled={!canManageScopedMembers || member.role === 'owner'}
+                                            aria-label={`${member.name} emoji`}
+                                        />
+                                        <input
+                                            className="chore-input member-name-input"
+                                            value={member.name}
+                                            onChange={(e) => updateScopedMemberName(member.id, e.target.value)}
+                                            onBlur={(e) => commitScopedMemberName(member.id, e.target.value)}
+                                            disabled={!canManageScopedMembers || member.role === 'owner'}
+                                        />
+                                        <select
+                                            className="chore-select member-role-select"
+                                            value={member.role}
+                                            onChange={(e) => updateScopedMemberRole(member.id, e.target.value)}
+                                            disabled={scopedCurrentUser?.role !== 'owner' || member.role === 'owner'}
+                                        >
+                                            <option value="owner">Owner</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="member">Member</option>
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className={`member-toggle-btn ${member.active ? 'active' : ''}`}
+                                            onClick={() => toggleScopedMemberActive(member.id)}
+                                            disabled={!canManageScopedMembers || member.role === 'owner'}
+                                        >
+                                            {member.active ? '啟用中' : '已停用'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="member-delete-btn"
+                                            onClick={() => deleteScopedMember(member.id)}
+                                            disabled={!canManageScopedMembers || member.role === 'owner' || member.id === scopedCurrentUserId}
+                                        >
+                                            刪除
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <form className="member-add-form" onSubmit={addScopedMember}>
+                                <input
+                                    className="member-emoji-input"
+                                    value={newMemberEmoji}
+                                    onChange={(e) => setNewMemberEmoji(e.target.value)}
+                                    maxLength={2}
+                                    disabled={!canManageScopedMembers}
+                                    aria-label="new member emoji"
+                                />
+                                <input
+                                    className="chore-input member-name-input"
+                                    value={newMemberName}
+                                    onChange={(e) => setNewMemberName(e.target.value)}
+                                    placeholder="新增成員名稱"
+                                    disabled={!canManageScopedMembers}
+                                />
+                                <button type="submit" className="member-add-btn" disabled={!canManageScopedMembers}>新增成員</button>
+                            </form>
+                            {memberError && <p className="form-error">{memberError}</p>}
+                            <div className="sheet-actions">
+                                <button onClick={closeScopedMembers}>完成</button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
                 createSpaceOpen && (
-                    <div className="modal" onClick={() => closeCreateSpace(true)}>
+                    <div className="modal" onClick={closeCreateSpace}>
                         <div className="sheet sheet-create-space" onClick={(e) => e.stopPropagation()}>
                             <h3>新建家庭空間</h3>
                             <p className="hub-context">建立後會自動切換到新空間，不會覆蓋既有空間資料。</p>
@@ -1896,7 +1987,7 @@ export default function App() {
                             </form>
                             {spaceError && <p className="form-error">{spaceError}</p>}
                             <div className="sheet-actions">
-                                <button onClick={() => closeCreateSpace(true)}>返回管理中心</button>
+                                <button onClick={closeCreateSpace}>返回管理中心</button>
                             </div>
                         </div>
                     </div>
