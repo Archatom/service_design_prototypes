@@ -17,10 +17,10 @@ const initialWorkspace = {
 };
 
 const initialChores = [
-    { id: 'c1', title: 'Water plants', weight: 3, done: false, assigneeId: 'm1', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'none' },
-    { id: 'c2', title: 'Fold laundry', weight: 4, done: false, assigneeId: 'm2', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'weekly' },
-    { id: 'c3', title: 'Clean table', weight: 2, done: false, assigneeId: 'm3', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'daily' },
-    { id: 'c4', title: 'Take out trash', weight: 5, done: false, assigneeId: 'm1', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'none' },
+    { id: 'c1', title: '澆花', weight: 3, done: false, assigneeId: 'm1', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'none' },
+    { id: 'c2', title: '摺衣服', weight: 4, done: false, assigneeId: 'm2', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'weekly' },
+    { id: 'c3', title: '擦桌子', weight: 2, done: false, assigneeId: 'm3', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'daily' },
+    { id: 'c4', title: '倒垃圾', weight: 5, done: false, assigneeId: 'm1', doneAt: null, date: dateKeyLocal(new Date()), recurrence: 'none' },
 ];
 
 const HELP_CREDIT_WEEKLY_LIMIT = 3;
@@ -1530,9 +1530,9 @@ export default function App() {
                 </section>
 
                 <section className="content-panel" aria-label="工作與事件區">
-                    <section className="bubbles" aria-label="工作清單管理">
+                    <section className="bubbles" aria-label="家事管理清單">
                         <div className="section-head">
-                            <h3 className="section-title">工作清單管理</h3>
+                            <h3 className="section-title">家事管理清單</h3>
                             <div className="section-actions">
                                 <button
                                     type="button"
